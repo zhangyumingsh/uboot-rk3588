@@ -8,6 +8,10 @@
 #define _ROCKCHIP_COMMON_H_
 #include <linux/sizes.h>
 
+#ifndef CFG_CPUID_OFFSET
+#define CFG_CPUID_OFFSET       0x7
+#endif
+
 #define COUNTER_FREQUENCY               24000000
 
 #if CONFIG_IS_ENABLED(TINY_FRAMEWORK) && !defined(CONFIG_ARM64)
@@ -82,6 +86,12 @@
 	#define BOOT_TARGET_RKNAND(func)
 #endif
 
+#if CONFIG_IS_ENABLED(CMD_NVME)
+	#define BOOT_TARGET_NVME(func) func(NVME, nvme, 0)
+#else
+	#define BOOT_TARGET_NVME(func)
+#endif
+
 #if CONFIG_IS_ENABLED(CMD_USB)
 	#define BOOT_TARGET_USB(func) func(USB, usb, 0)
 #else
@@ -101,12 +111,20 @@
 #endif
 
 #define BOOT_TARGET_DEVICES(func) \
+	BOOT_TARGET_NVME(func) \
 	BOOT_TARGET_MMC(func) \
 	BOOT_TARGET_MTD(func) \
 	BOOT_TARGET_RKNAND(func) \
 	BOOT_TARGET_USB(func) \
 	BOOT_TARGET_PXE(func) \
 	BOOT_TARGET_DHCP(func)
+
+
+#ifdef CONFIG_ARM64
+#define FDTFILE "rockchip/" CONFIG_DEFAULT_DEVICE_TREE ".dtb" "\0"
+#else
+#define FDTFILE CONFIG_DEFAULT_DEVICE_TREE ".dtb" "\0"
+#endif
 
 #ifdef CONFIG_ARM64
 #define ROOT_UUID "B921B045-1DF0-41C3-AF44-4C6F280D3FAE;\0"
@@ -142,7 +160,9 @@
 
 #define RKIMG_DET_BOOTDEV \
 	"rkimg_bootdev=" \
-	"if mmc dev 1 && rkimgtest mmc 1; then " \
+	"if nvme dev 0; then " \
+		"setenv devtype nvme; setenv devnum 0; echo Boot from nvme;" \
+	"elif mmc dev 1 && rkimgtest mmc 1; then " \
 		"setenv devtype mmc; setenv devnum 1; echo Boot from SDcard;" \
 	"elif mmc dev 0; then " \
 		"setenv devtype mmc; setenv devnum 0;" \
@@ -170,10 +190,10 @@
 	"boot_fit;"
 #else
 #define RKIMG_BOOTCOMMAND			\
+	"run distro_bootcmd;"			\
 	"boot_android ${devtype} ${devnum};"	\
 	"boot_fit;"				\
-	"bootrkp;"				\
-	"run distro_bootcmd;"
+	"bootrkp;"
 #endif
 
 #endif /* CONFIG_SPL_BUILD */
